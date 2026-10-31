@@ -57,6 +57,14 @@ jobs:
           lib_gradle = Path("android-app/lib/build.gradle.kts")
           lib_text = lib_gradle.read_text().replace('minSdk = 33', 'minSdk = 30')
           lib_gradle.write_text(lib_text)
+          # Point native CMake at the sibling llama.cpp checkout in Actions.
+          cmake = Path("android-app/lib/src/main/cpp/CMakeLists.txt")
+          cmake_text = cmake.read_text()
+          cmake_text = cmake_text.replace(
+              'set(LLAMA_SRC ${CMAKE_CURRENT_LIST_DIR}/../../../../../../)',
+              'set(LLAMA_SRC ${CMAKE_CURRENT_LIST_DIR}/../../../../../../llama.cpp)'
+          )
+          cmake.write_text(cmake_text)
           strings = Path("android-app/app/src/main/res/values/strings.xml")
           strings.write_text('''<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="app_name">Ash wa Azida</string>\n</resources>\n''')
           PY
