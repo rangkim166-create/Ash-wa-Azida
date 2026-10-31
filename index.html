@@ -59,9 +59,7 @@
 </main>
 
 <script type="module">
-  import { Wllama } from "https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/+esm";
-  import WasmFromCDN from "https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/esm/wasm-from-cdn.js";
-
+  let Wllama = null, WasmFromCDN = null, runtimeError = null;
   const $ = (id) => document.getElementById(id);
   const statusEl = $("status"), dot = $("dot"), chatEl = $("chat"), debugEl = $("debug");
   const fileInput = $("fileInput"), promptEl = $("prompt"), sendBtn = $("sendBtn");
@@ -69,6 +67,30 @@
   const STORAGE_KEY = "ash-wa-azida-chat-v2";
   const SYSTEM = "You are Ash, also known as Azida — a helpful, warm, practical assistant. Speak naturally and honestly. Be clear about what you can and cannot do. You are running locally on the user's device; do not claim internet access, phone control, or actions you have not actually performed. Keep answers concise unless detail is requested.";
   let wllama = null, messages = [], generating = false;
+
+  // Load the runtime dynamically so CDN/import failures appear in Diagnostics
+  // instead of silently preventing this entire module from starting.
+  setStatus("Connecting to AI runtime…");
+  log("Starting Wllama module download from jsDelivr…");
+  try {
+    const imports = Promise.all([
+      import("https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/+esm"),
+      import("https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/esm/wasm-from-cdn.js")
+    ]);
+    const loaded = await Promise.race([
+      imports,
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Runtime download timed out after 25 seconds. Check connection or CDN access.")), 25000))
+    ]);
+    Wllama = loaded[0].Wllama;
+    WasmFromCDN = loaded[1].default;
+    if (typeof Wllama !== "function" || !WasmFromCDN) throw new Error("Wllama module loaded but its exports were missing.");
+    log("Wllama 3.8.1 JavaScript module loaded.");
+  } catch (error) {
+    runtimeError = error;
+    setStatus("Runtime failed to start");
+    log("RUNTIME IMPORT ERROR: " + (error?.stack || error?.message || String(error)));
+    composerHint.textContent = "Runtime could not start. Check Diagnostics and reload after fixing the connection.";
+  }
 
   function log(message) {
     const stamp = new Date().toLocaleTimeString();
@@ -117,6 +139,7 @@
   }
 
   async function createRuntime() {
+    if (runtimeError || !Wllama || !WasmFromCDN) throw runtimeError || new Error("Wllama runtime is unavailable.");
     if (wllama) {
       try { await wllama.exit(); } catch (_) {}
     }
@@ -240,8 +263,10 @@
     const a = document.createElement("a"); a.href = url; a.download = "ash-wa-azida-chat.json"; a.click();
     URL.revokeObjectURL(url);
   });
-  setStatus("Runtime ready — choose a GGUF model");
-  log("Wllama 3.8.1 module loaded. Model inference stays on this device.");
+  if (!runtimeError) {
+    setStatus("Runtime ready — choose a GGUF model");
+    log("Wllama 3.8.1 module loaded. Model inference stays on this device.");
+  }
 </script>
 </body>
 </html>
