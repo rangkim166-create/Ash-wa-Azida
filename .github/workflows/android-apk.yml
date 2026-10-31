@@ -22,11 +22,9 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Install Android build tools
         run: |
+          yes | sdkmanager --licenses
           sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;29.0.13113456" "cmake;3.31.6"
 
       - name: Fetch pinned llama.cpp Android implementation
