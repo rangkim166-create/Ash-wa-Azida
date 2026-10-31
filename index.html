@@ -3,13 +3,14 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ash wa Azida</title></head>
 <body>
 <h3>Ash wa Azida</h3>
-<p id="status">Load GGUF file below</p>
+<p id="status">Load GGUF</p>
 <input type="file" id="fileInput" accept=".gguf">
 <hr>
-<div id="chat"></div>
+<div id="chat" style="white-space:pre-wrap"></div>
 <hr>
-<input id="prompt" style="width:65%;padding:12px;font-size:16px" placeholder="Type here..." type="text" inputmode="text">
-<button id="sendBtn" style="padding:12px">SEND</button>
+<input id="prompt" style="width:65%;padding:12px" placeholder="Type here...">
+<button id="sendBtn">SEND</button>
+<div id="debug" style="background:#111;color:lime;padding:5px;font-size:11px;white-space:pre-wrap"></div>
 
 <script type="module">
 import { Wllama } from 'https://cdn.jsdelivr.net/npm/@wllama/wllama@2.3.4/+esm';
@@ -17,28 +18,46 @@ const CONFIG = {
   'single-thread/wllama.wasm': 'https://cdn.jsdelivr.net/npm/@wllama/wllama@2.3.4/esm/single-thread/wllama.wasm',
   'multi-thread/wllama.wasm': 'https://cdn.jsdelivr.net/npm/@wllama/wllama@2.3.4/esm/multi-thread/wllama.wasm',
 };
-let wllama=null, chatHistory="";
-const status=document.getElementById('status'), chat=document.getElementById('chat'), fileInput=document.getElementById('fileInput'), prompt=document.getElementById('prompt'), sendBtn=document.getElementById('sendBtn');
+let wllama=null, history="";
+const status=document.getElementById('status'), chat=document.getElementById('chat'), debug=document.getElementById('debug'), fileInput=document.getElementById('fileInput'), prompt=document.getElementById('prompt'), sendBtn=document.getElementById('sendBtn');
+function log(m){ debug.textContent += "\n" + m; }
 fileInput.onchange=async()=>{
-  status.textContent="Loading... wait 30s";
-  wllama=new Wllama(CONFIG);
-  await wllama.loadModel([fileInput.files[0]],{n_threads:2});
-  status.textContent="READY! Now type below";
+  try{
+    log("Loading file: "+fileInput.files[0].name);
+    status.textContent="Loading model... wait 30-60s";
+    wllama=new Wllama(CONFIG, { suppressNativeLog: false });
+    log("Wllama created");
+    await wllama.loadModel([fileInput.files[0]], { n_threads: 2, n_ctx: 2048 });
+    log("Model loaded SUCCESS");
+    status.textContent="READY - Type and send";
+  }catch(e){ log("LOAD ERROR: "+e.message); console.error(e); }
 };
 async function sendMessage(){
   const text=prompt.value.trim();
-  if(!text){ return; }
-  if(!wllama){ alert("Load GGUF file first!"); return; }
+  if(!text) return;
+  if(!wllama){ log("No model loaded"); return; }
   prompt.value="";
-  const u=document.createElement('div'); u.textContent="You: "+text; chat.appendChild(u);
-  const a=document.createElement('div'); a.textContent="Ash: ..."; chat.appendChild(a);
+  chat.innerHTML += "\n\nYOU: "+text+"\nASH: ";
+  log("Generating for: "+text);
   const formatted=`<|im_start|>user\n${text}<|im_end|>\n<|im_start|>assistant\n`;
-  let response="";
-  await wllama.createCompletion(chatHistory+formatted,{
-    nPredict:400,
-    onNewToken:(t,p,c)=>{ response=c; a.textContent="Ash: "+response; }
-  });
-  chatHistory+=formatted+response+"<|im_end|>\n";
+  const fullPrompt = history + formatted;
+  log("Full prompt length: "+fullPrompt.length);
+  try{
+    let result = "";
+    await wllama.createCompletion(fullPrompt, {
+      nPredict: 200,
+      sampling: { temp: 0.7, top_p: 0.9, top_k: 40 },
+      onNewToken: (token, piece, currentText) => {
+        result = currentText;
+        log("Token: "+piece);
+        // update last line
+        const lines = chat.innerHTML.split("\n");
+        chat.innerHTML = chat.innerHTML.replace(/ASH:.*$/s, "ASH: "+result);
+      }
+    });
+    log("Generation finished, result length: "+result.length);
+    history += formatted + result + "<|im_end|>\n";
+  }catch(e){ log("GEN ERROR: "+e.message); console.error(e); }
 }
 sendBtn.onclick=sendMessage;
 prompt.onkeydown=e=>{ if(e.key==="Enter") sendMessage(); };
