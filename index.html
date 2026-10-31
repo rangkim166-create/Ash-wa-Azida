@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ash wa Azida</title>
+<link rel="manifest" href="manifest.json">
+</head>
+<body>
+<h2>Ash wa Azida - Offline AI</h2>
+<p id="status">Step 1: Click Load GGUF and pick your 379MB file</p>
+<input type="file" id="file" accept=".gguf">
+<hr>
+<div id="chat" style="white-space:pre-wrap"></div>
+<hr>
+<input id="prompt" placeholder="Andika hapa..." style="width:70%" disabled>
+<button id="send" disabled>Send</button>
+
+<script type="module">
+import { Wllama } from 'https://cdn.jsdelivr.net/npm/@wllama/wllama@2.3.2/+esm';
+
+const CONFIG_PATHS = {
+  'single-thread/wllama.wasm': 'https://cdn.jsdelivr.net/npm/@wllama/wllama@2.3.2/esm/single-thread/wllama.wasm',
+  'multi-thread/wllama.wasm': 'https://cdn.jsdelivr.net/npm/@wllama/wllama@2.3.2/esm/multi-thread/wllama.wasm',
+};
+
+let wllama = null;
+let history = [];
+const status = document.getElementById('status');
+const fileInput = document.getElementById('file');
+const promptInput = document.getElementById('prompt');
+const sendBtn = document.getElementById('send');
+const chatDiv = document.getElementById('chat');
+
+function add(text){
+  const div = document.createElement('div');
+  div.textContent = text;
+  chatDiv.appendChild(div);
+  window.scrollTo(0, document.body.scrollHeight);
+  return div;
+}
+
+fileInput.addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  status.textContent = "Loading model... inabidi subiri 20-30 sec";
+  promptInput.disabled = true;
+  sendBtn.disabled = true;
+  
+  wllama = new Wllama(CONFIG_PATHS);
+  await wllama.loadModel([file], { n_threads: 4, useCache: false });
+  
+  status.textContent = "TAYARI! Model: "+file.name;
+  promptInput.disabled = false;
+  sendBtn.disabled = false;
+  add("--- Ash wa Azida is ready ---");
+});
+
+async function run(){
+  const text = promptInput.value.trim();
+  if(!text || !wllama) return;
+  promptInput.value = "";
+  add("YOU: "+text);
+  
+  history.push(`<|im_start|>user\n${text}<|im_end|>\n<|im_start|>assistant\n`);
+  const promptText = history.join("");
+  
+  const aiDiv = add("ASH: ");
+  let full = "";
+  
+  await wllama.createCompletion(promptText, {
+    nPredict: 512,
+    sampling: { temp: 0.6, top_p: 0.9 },
+    onNewToken: (token, piece, currentText) => {
+      full = currentText;
+      aiDiv.textContent = "ASH: " + full;
+    }
+  });
+  
+  history[history.length-1] += full + "<|im_end|>\n";
+}
+
+sendBtn.onclick = run;
+promptInput.onkeydown = (e)=>{ if(e.key==='Enter') run(); };
+</script>
+</body>
+</html>
