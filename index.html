@@ -1,66 +1,247 @@
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ash wa Azida</title></head>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#090d16">
+  <meta name="description" content="Ash wa Azida — private, local GGUF AI chat.">
+  <title>Ash wa Azida</title>
+  <link rel="manifest" href="./manifest.json">
+  <style>
+    :root{color-scheme:dark;--bg:#090d16;--panel:#111827;--line:#263246;--text:#eef3ff;--muted:#9ba9bf;--accent:#7c9cff;--good:#5ed6a0;--bad:#ff8585}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px system-ui,-apple-system,Segoe UI,sans-serif;min-height:100vh}
+    .app{max-width:850px;margin:auto;padding:18px 14px 28px;display:flex;flex-direction:column;min-height:100dvh;gap:12px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px}.brand{display:flex;align-items:center;gap:10px}.logo{width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,#7898ff,#9b75df);display:grid;place-items:center;font-weight:800;color:#07101f}
+    h1{font-size:19px;margin:0}.sub{color:var(--muted);font-size:12px;margin-top:2px}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:13px}
+    .statusrow{display:flex;align-items:center;justify-content:space-between;gap:8px}.status{font-size:13px;color:var(--muted)}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#e2ae59;margin-right:7px}.dot.ready{background:var(--good)}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:11px}button,.filelabel{border:1px solid var(--line);border-radius:11px;padding:10px 13px;background:#1b2638;color:var(--text);font:inherit;font-size:13px;cursor:pointer}
+    button.primary{background:var(--accent);border-color:var(--accent);color:#081225;font-weight:700}button:disabled{opacity:.45;cursor:not-allowed}input[type=file]{display:none}
+    .hint{color:var(--muted);font-size:12px;line-height:1.5;margin:10px 0 0}.warning{color:#ffd18a}
+    #chat{flex:1;min-height:240px;max-height:55dvh;overflow:auto;display:flex;flex-direction:column;gap:10px;padding:4px 1px}
+    .bubble{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55;padding:11px 13px;border-radius:14px;max-width:94%;border:1px solid var(--line)}.bubble.user{align-self:flex-end;background:#1b2b48}.bubble.assistant{align-self:flex-start;background:#111827}.label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
+    .composer{display:flex;gap:8px;align-items:flex-end}.composer textarea{flex:1;resize:vertical;min-height:48px;max-height:140px;background:#0e1522;border:1px solid var(--line);border-radius:12px;padding:12px;color:var(--text);font:inherit;outline:none}.composer textarea:focus{border-color:var(--accent)}
+    #debug{font:11px ui-monospace,monospace;color:#9ba9bf;white-space:pre-wrap;max-height:90px;overflow:auto}
+    .small{font-size:11px;color:var(--muted)}.actions{display:flex;justify-content:space-between;align-items:center;gap:8px}
+    @media(min-width:700px){.app{padding-top:28px}#chat{max-height:60dvh}}
+  </style>
+</head>
 <body>
-<h3>Ash wa Azida</h3>
-<p id="status">Load GGUF</p>
-<input type="file" id="fileInput" accept=".gguf">
-<hr>
-<div id="chat" style="white-space:pre-wrap"></div>
-<hr>
-<input id="prompt" style="width:65%;padding:12px" placeholder="Type here...">
-<button id="sendBtn">SEND</button>
-<div id="debug" style="background:#111;color:lime;padding:5px;font-size:11px;white-space:pre-wrap"></div>
+<main class="app">
+  <header>
+    <div class="brand"><div class="logo">A</div><div><h1>Ash wa Azida</h1><div class="sub">Private local AI · GGUF on this device</div></div></div>
+    <span class="small">No API key</span>
+  </header>
+
+  <section class="card">
+    <div class="statusrow"><div class="status"><span id="dot" class="dot"></span><span id="status">Runtime loading…</span></div><span id="modelInfo" class="small"></span></div>
+    <div class="controls">
+      <label class="filelabel" for="fileInput">Choose GGUF model</label>
+      <input id="fileInput" type="file" accept=".gguf" multiple>
+      <button id="unloadBtn" disabled>Unload model</button>
+      <button id="clearBtn">Clear chat</button>
+      <button id="exportBtn">Export chat</button>
+    </div>
+    <p class="hint">Choose one GGUF file, or select every shard of a split model together. Large models can exceed phone memory. On an 8 GB phone, start with a small 1B–3B Q4 model and a 2,048-token context.</p>
+    <p class="hint warning">Important: a single GGUF file larger than 2 GB is not supported by this browser runtime. Split models into shards (ideally 512 MB each); selecting shards does not make a 4.7 GB model light enough for an 8 GB phone.</p>
+  </section>
+
+  <section id="chat" aria-live="polite"></section>
+
+  <section class="card">
+    <div class="composer">
+      <textarea id="prompt" rows="1" placeholder="Talk to Ash…" disabled></textarea>
+      <button id="sendBtn" class="primary" disabled>Send</button>
+    </div>
+    <div class="actions" style="margin-top:9px"><span class="small" id="composerHint">Load a GGUF model to begin.</span><span class="small">Enter to send · Shift+Enter for new line</span></div>
+  </section>
+  <details class="card"><summary class="small">Diagnostics</summary><div id="debug">Starting…</div></details>
+</main>
 
 <script type="module">
-import { Wllama } from 'https://cdn.jsdelivr.net/npm/@wllama/wllama@2.3.4/+esm';
-const CONFIG = {
-  'single-thread/wllama.wasm': 'https://cdn.jsdelivr.net/npm/@wllama/wllama@2.3.4/esm/single-thread/wllama.wasm',
-  'multi-thread/wllama.wasm': 'https://cdn.jsdelivr.net/npm/@wllama/wllama@2.3.4/esm/multi-thread/wllama.wasm',
-};
-let wllama=null, history="";
-const status=document.getElementById('status'), chat=document.getElementById('chat'), debug=document.getElementById('debug'), fileInput=document.getElementById('fileInput'), prompt=document.getElementById('prompt'), sendBtn=document.getElementById('sendBtn');
-function log(m){ debug.textContent += "\n" + m; }
-fileInput.onchange=async()=>{
-  try{
-    log("Loading file: "+fileInput.files[0].name);
-    status.textContent="Loading model... wait 30-60s";
-    wllama=new Wllama(CONFIG, { suppressNativeLog: false });
-    log("Wllama created");
-    await wllama.loadModel([fileInput.files[0]], { n_threads: 2, n_ctx: 2048 });
-    log("Model loaded SUCCESS");
-    status.textContent="READY - Type and send";
-  }catch(e){ log("LOAD ERROR: "+e.message); console.error(e); }
-};
-async function sendMessage(){
-  const text=prompt.value.trim();
-  if(!text) return;
-  if(!wllama){ log("No model loaded"); return; }
-  prompt.value="";
-  chat.innerHTML += "\n\nYOU: "+text+"\nASH: ";
-  log("Generating for: "+text);
-  const formatted=`<|im_start|>user\n${text}<|im_end|>\n<|im_start|>assistant\n`;
-  const fullPrompt = history + formatted;
-  log("Full prompt length: "+fullPrompt.length);
-  try{
-    let result = "";
-    await wllama.createCompletion(fullPrompt, {
-      nPredict: 200,
-      sampling: { temp: 0.7, top_p: 0.9, top_k: 40 },
-      onNewToken: (token, piece, currentText) => {
-        result = currentText;
-        log("Token: "+piece);
-        // update last line
-        const lines = chat.innerHTML.split("\n");
-        chat.innerHTML = chat.innerHTML.replace(/ASH:.*$/s, "ASH: "+result);
+  import { Wllama } from "https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/+esm";
+  import WasmFromCDN from "https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/esm/wasm-from-cdn.js";
+
+  const $ = (id) => document.getElementById(id);
+  const statusEl = $("status"), dot = $("dot"), chatEl = $("chat"), debugEl = $("debug");
+  const fileInput = $("fileInput"), promptEl = $("prompt"), sendBtn = $("sendBtn");
+  const unloadBtn = $("unloadBtn"), modelInfo = $("modelInfo"), composerHint = $("composerHint");
+  const STORAGE_KEY = "ash-wa-azida-chat-v2";
+  const SYSTEM = "You are Ash, also known as Azida — a helpful, warm, practical assistant. Speak naturally and honestly. Be clear about what you can and cannot do. You are running locally on the user's device; do not claim internet access, phone control, or actions you have not actually performed. Keep answers concise unless detail is requested.";
+  let wllama = null, messages = [], generating = false;
+
+  function log(message) {
+    const stamp = new Date().toLocaleTimeString();
+    debugEl.textContent = "[" + stamp + "] " + message + "\n" + debugEl.textContent;
+  }
+  function setStatus(message, ready = false) {
+    statusEl.textContent = message;
+    dot.classList.toggle("ready", ready);
+  }
+  function persist() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-24))); }
+    catch (error) { log("Chat could not be saved: " + error.message); }
+  }
+  function addBubble(role, text) {
+    const bubble = document.createElement("div");
+    bubble.className = "bubble " + role;
+    const label = document.createElement("div");
+    label.className = "label";
+    label.textContent = role === "user" ? "You" : "Ash";
+    const body = document.createElement("div");
+    body.textContent = text;
+    bubble.append(label, body);
+    chatEl.appendChild(bubble);
+    chatEl.scrollTop = chatEl.scrollHeight;
+    return body;
+  }
+  function renderHistory() {
+    chatEl.replaceChildren();
+    for (const message of messages) addBubble(message.role, message.content);
+    if (!messages.length) {
+      const welcome = document.createElement("div");
+      welcome.className = "small";
+      welcome.style.cssText = "text-align:center;padding:35px 12px";
+      welcome.textContent = "Your conversations stay in this browser. Load a model to start chatting.";
+      chatEl.appendChild(welcome);
+    }
+  }
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    if (Array.isArray(saved)) messages = saved.filter(m => m && ["user","assistant"].includes(m.role) && typeof m.content === "string").slice(-24);
+  } catch (error) { log("Saved chat could not be read: " + error.message); }
+  renderHistory();
+
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+    navigator.serviceWorker.register("./sw.js").then(() => log("Offline app shell registered")).catch(e => log("Service worker: " + e.message));
+  }
+
+  async function createRuntime() {
+    if (wllama) {
+      try { await wllama.exit(); } catch (_) {}
+    }
+    wllama = new Wllama(WasmFromCDN);
+  }
+
+  fileInput.addEventListener("change", async () => {
+    const files = Array.from(fileInput.files || []).sort((a,b) => a.name.localeCompare(b.name, undefined, {numeric:true}));
+    if (!files.length) return;
+    const oversized = files.find(file => file.size > 2 * 1024 * 1024 * 1024);
+    if (oversized) {
+      setStatus("File too large for browser loading");
+      log(oversized.name + " is larger than the 2 GB browser limit. Split the GGUF first.");
+      fileInput.value = "";
+      return;
+    }
+    const total = files.reduce((sum, file) => sum + file.size, 0);
+    const totalGB = (total / (1024 ** 3)).toFixed(2);
+    if (total > 2 * 1024 ** 3 && !confirm("These files total " + totalGB + " GB. This may crash or freeze your 8 GB phone. Continue anyway?")) {
+      fileInput.value = "";
+      return;
+    }
+    sendBtn.disabled = true; promptEl.disabled = true; unloadBtn.disabled = true;
+    modelInfo.textContent = totalGB + " GB";
+    setStatus("Preparing model…");
+    log("Selected " + files.length + " GGUF file(s), total " + totalGB + " GB");
+    try {
+      await createRuntime();
+      setStatus("Loading model — keep this page open…");
+      await wllama.loadModel(files, {
+        n_threads: 2,
+        n_ctx: 2048,
+        n_gpu_layers: 0,
+        jinja: true
+      });
+      setStatus("Model ready", true);
+      modelInfo.textContent = files.length + " file(s) · " + totalGB + " GB";
+      promptEl.disabled = false; sendBtn.disabled = false; unloadBtn.disabled = false;
+      composerHint.textContent = "Ash is running locally. First load may take a while.";
+      promptEl.focus();
+      log("Model loaded. Chat template: " + (wllama.getChatTemplate() ? "available" : "not found; runtime fallback will be used"));
+    } catch (error) {
+      setStatus("Model failed to load");
+      log("LOAD ERROR: " + (error?.stack || error?.message || String(error)));
+      try { if (wllama) await wllama.exit(); } catch (_) {}
+      wllama = null;
+      modelInfo.textContent = "";
+      composerHint.textContent = "Check Diagnostics, model size, and browser memory.";
+      alert("Ash could not load this model. Open Diagnostics for the error. Large GGUF files may exceed phone memory.");
+    }
+  });
+
+  async function sendMessage() {
+    const text = promptEl.value.trim();
+    if (!text || !wllama || generating) return;
+    promptEl.value = "";
+    messages.push({ role: "user", content: text });
+    const userBubble = addBubble("user", text);
+    const assistantBody = addBubble("assistant", "");
+    const assistantBubble = assistantBody.parentElement;
+    generating = true; sendBtn.disabled = true; promptEl.disabled = true;
+    composerHint.textContent = "Ash is thinking…";
+    try {
+      const context = messages.slice(-12);
+      const stream = await wllama.createChatCompletion({
+        messages: [{ role: "system", content: SYSTEM }, ...context],
+        max_tokens: 220,
+        temperature: 0.7,
+        top_p: 0.9,
+        top_k: 40,
+        stream: true
+      });
+      let answer = "";
+      for await (const chunk of stream) {
+        const piece = chunk?.choices?.[0]?.delta?.content || "";
+        if (piece) {
+          answer += piece;
+          assistantBody.textContent = answer;
+          chatEl.scrollTop = chatEl.scrollHeight;
+        }
       }
-    });
-    log("Generation finished, result length: "+result.length);
-    history += formatted + result + "<|im_end|>\n";
-  }catch(e){ log("GEN ERROR: "+e.message); console.error(e); }
-}
-sendBtn.onclick=sendMessage;
-prompt.onkeydown=e=>{ if(e.key==="Enter") sendMessage(); };
+      if (!answer.trim()) answer = "(The model returned an empty response. Try again or check its chat template.)";
+      assistantBody.textContent = answer;
+      messages.push({ role: "assistant", content: answer });
+      messages = messages.slice(-24);
+      persist();
+      log("Reply complete (" + answer.length + " characters)");
+    } catch (error) {
+      assistantBubble.remove();
+      messages.pop();
+      persist();
+      log("GENERATION ERROR: " + (error?.stack || error?.message || String(error)));
+      addBubble("assistant", "I hit a generation error. Open Diagnostics for details, then try again.");
+    } finally {
+      generating = false;
+      sendBtn.disabled = !wllama;
+      promptEl.disabled = !wllama;
+      composerHint.textContent = wllama ? "Ash is ready." : "Load a GGUF model to begin.";
+      promptEl.focus();
+    }
+  }
+
+  sendBtn.addEventListener("click", sendMessage);
+  promptEl.addEventListener("keydown", event => {
+    if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendMessage(); }
+  });
+  unloadBtn.addEventListener("click", async () => {
+    if (generating || !wllama) return;
+    try { await wllama.exit(); } catch (error) { log("Unload warning: " + error.message); }
+    wllama = null; promptEl.disabled = true; sendBtn.disabled = true; unloadBtn.disabled = true;
+    modelInfo.textContent = ""; setStatus("Model unloaded"); composerHint.textContent = "Load a GGUF model to begin.";
+    log("Model unloaded");
+  });
+  $("clearBtn").addEventListener("click", () => {
+    if (!confirm("Clear this browser's saved conversation?")) return;
+    messages = []; persist(); renderHistory(); log("Conversation cleared");
+  });
+  $("exportBtn").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify({ app:"Ash wa Azida", exportedAt:new Date().toISOString(), messages }, null, 2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "ash-wa-azida-chat.json"; a.click();
+    URL.revokeObjectURL(url);
+  });
+  setStatus("Runtime ready — choose a GGUF model");
+  log("Wllama 3.8.1 module loaded. Model inference stays on this device.");
 </script>
 </body>
 </html>
