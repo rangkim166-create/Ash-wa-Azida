@@ -52,6 +52,11 @@ jobs:
           s = s.replace('isMinifyEnabled = true', 'isMinifyEnabled = false')
           s = s.replace('isShrinkResources = true', 'isShrinkResources = false')
           p.write_text(s)
+          # The upstream sample currently declares API 33 in its library as well.
+          # Lower both modules to API 30 for the user's Android 11 device.
+          lib_gradle = Path("android-app/lib/build.gradle.kts")
+          lib_text = lib_gradle.read_text().replace('minSdk = 33', 'minSdk = 30')
+          lib_gradle.write_text(lib_text)
           strings = Path("android-app/app/src/main/res/values/strings.xml")
           strings.write_text('''<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="app_name">Ash wa Azida</string>\n</resources>\n''')
           PY
