@@ -1,0 +1,77 @@
+name: Build Ash wa Azida Android APK
+
+on:
+  push:
+    branches: [native-android]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout Ash wa Azida
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android build tools
+        run: |
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;29.0.13113456" "cmake;3.31.6"
+
+      - name: Fetch pinned llama.cpp Android implementation
+        run: |
+          git clone https://github.com/ggml-org/llama.cpp.git llama.cpp
+          cd llama.cpp
+          git checkout f3586e66bc916d672773d4a6505513ba91a3595c
+
+      - name: Prepare branded Android project
+        run: |
+          mkdir -p android-app
+          cp -a llama.cpp/examples/llama.android/. android-app/
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android-app/app/build.gradle.kts")
+          s = p.read_text()
+          s = s.replace('namespace = "com.example.llama"', 'namespace = "com.example.llama"')
+          s = s.replace('applicationId = "com.example.llama.aichat"', 'applicationId = "com.ash.waazida"')
+          s = s.replace('minSdk = 33', 'minSdk = 30')
+          s = s.replace('targetSdk = 36', 'targetSdk = 32')
+          s = s.replace('isMinifyEnabled = true', 'isMinifyEnabled = false')
+          s = s.replace('isShrinkResources = true', 'isShrinkResources = false')
+          p.write_text(s)
+          strings = Path("android-app/app/src/main/res/values/strings.xml")
+          strings.write_text('''<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="app_name">Ash wa Azida</string>\n</resources>\n''')
+          PY
+          chmod +x android-app/gradlew
+
+      - name: Build arm64 Android APK
+        working-directory: android-app
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/29.0.13113456
+        run: |
+          ./gradlew --no-daemon --stacktrace :app:assembleDebug
+
+      - name: Verify APK exists and report size
+        run: |
+          test -s android-app/app/build/outputs/apk/debug/app-debug.apk
+          ls -lh android-app/app/build/outputs/apk/debug/app-debug.apk
+          sha256sum android-app/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ash-wa-azida-arm64-debug-apk
+          path: android-app/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
