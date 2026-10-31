@@ -1,0 +1,7 @@
+{
+  "name": "Ash wa Azida",
+  "short_name": "Azida",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#000000"
+}
