@@ -2,77 +2,46 @@
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ash wa Azida</title></head>
 <body>
-<h3>Ash wa Azida - Offline AI</h3>
-<p id="status">Step 1: Load your GGUF file</p>
+<h3>Ash wa Azida</h3>
+<p id="status">Load GGUF file below</p>
 <input type="file" id="fileInput" accept=".gguf">
 <hr>
-<div id="chat" style="display:flex;flex-direction:column;gap:10px"></div>
+<div id="chat"></div>
 <hr>
-<input id="prompt" style="width:65%;padding:10px" placeholder="Type message..." disabled>
-<button id="sendBtn" disabled>SEND</button>
+<input id="prompt" style="width:65%;padding:12px;font-size:16px" placeholder="Type here..." type="text" inputmode="text">
+<button id="sendBtn" style="padding:12px">SEND</button>
 
 <script type="module">
 import { Wllama } from 'https://cdn.jsdelivr.net/npm/@wllama/wllama@2.3.4/+esm';
-
 const CONFIG = {
   'single-thread/wllama.wasm': 'https://cdn.jsdelivr.net/npm/@wllama/wllama@2.3.4/esm/single-thread/wllama.wasm',
   'multi-thread/wllama.wasm': 'https://cdn.jsdelivr.net/npm/@wllama/wllama@2.3.4/esm/multi-thread/wllama.wasm',
 };
-
-let wllama = null;
-let chatHistory = "";
-const status = document.getElementById('status');
-const chat = document.getElementById('chat');
-const fileInput = document.getElementById('fileInput');
-const prompt = document.getElementById('prompt');
-const sendBtn = document.getElementById('sendBtn');
-
-function addMessage(sender, text){
-  const div = document.createElement('div');
-  div.style.padding="10px"; div.style.borderRadius="10px"; div.style.maxWidth="90%";
-  if(sender==="You"){ div.style.alignSelf="flex-end"; div.style.background="#2563eb"; div.style.color="white"; }
-  else{ div.style.alignSelf="flex-start"; div.style.background="#f1f1f1"; }
-  div.textContent = sender + ": " + text;
-  chat.appendChild(div);
-  div.scrollIntoView();
-  return div;
-}
-
-fileInput.onchange = async () => {
-  const file = fileInput.files[0];
-  status.textContent = "Loading " + file.name + " ... wait 30 seconds";
-  wllama = new Wllama(CONFIG);
-  await wllama.loadModel([file], {n_threads: 2});
-  status.textContent = "READY! You can now send messages";
-  prompt.disabled = false;
-  sendBtn.disabled = false;
+let wllama=null, chatHistory="";
+const status=document.getElementById('status'), chat=document.getElementById('chat'), fileInput=document.getElementById('fileInput'), prompt=document.getElementById('prompt'), sendBtn=document.getElementById('sendBtn');
+fileInput.onchange=async()=>{
+  status.textContent="Loading... wait 30s";
+  wllama=new Wllama(CONFIG);
+  await wllama.loadModel([fileInput.files[0]],{n_threads:2});
+  status.textContent="READY! Now type below";
 };
-
 async function sendMessage(){
-  const text = prompt.value.trim();
-  if(!text || !wllama) return;
-  prompt.value = "";
-  addMessage("You", text);
-
-  const formatted = `<|im_start|>user\n${text}<|im_end|>\n<|im_start|>assistant\n`;
-  const fullPrompt = chatHistory + formatted;
-
-  const aiBubble = addMessage("Ash", "...");
-  let response = "";
-
-  await wllama.createCompletion(fullPrompt, {
-    nPredict: 400,
-    onNewToken: (t, piece, current) => {
-      response = current;
-      aiBubble.textContent = "Ash: " + response;
-    }
+  const text=prompt.value.trim();
+  if(!text){ return; }
+  if(!wllama){ alert("Load GGUF file first!"); return; }
+  prompt.value="";
+  const u=document.createElement('div'); u.textContent="You: "+text; chat.appendChild(u);
+  const a=document.createElement('div'); a.textContent="Ash: ..."; chat.appendChild(a);
+  const formatted=`<|im_start|>user\n${text}<|im_end|>\n<|im_start|>assistant\n`;
+  let response="";
+  await wllama.createCompletion(chatHistory+formatted,{
+    nPredict:400,
+    onNewToken:(t,p,c)=>{ response=c; a.textContent="Ash: "+response; }
   });
-
-  chatHistory += formatted + response + "<|im_end|>\n";
+  chatHistory+=formatted+response+"<|im_end|>\n";
 }
-
-sendBtn.onclick = sendMessage;
-prompt.onkeydown = (e) => { if(e.key==="Enter") sendMessage(); };
+sendBtn.onclick=sendMessage;
+prompt.onkeydown=e=>{ if(e.key==="Enter") sendMessage(); };
 </script>
 </body>
 </html>
