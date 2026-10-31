@@ -33,14 +33,14 @@ jobs:
 
       - name: Fetch pinned llama.cpp Android implementation
         run: |
-          git clone https://github.com/ggml-org/llama.cpp.git llama.cpp
-          cd llama.cpp
+          git clone https://github.com/ggml-org/llama.cpp.git ../llama.cpp
+          cd ../llama.cpp
           git checkout f3586e66bc916d672773d4a6505513ba91a3595c
 
       - name: Prepare branded Android project
         run: |
           mkdir -p android-app
-          cp -a llama.cpp/examples/llama.android/. android-app/
+          cp -a ../llama.cpp/examples/llama.android/. android-app/
           python3 - <<'PY'
           from pathlib import Path
           p = Path("android-app/app/build.gradle.kts")
