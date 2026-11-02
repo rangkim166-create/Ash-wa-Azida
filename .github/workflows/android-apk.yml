@@ -70,6 +70,13 @@ jobs:
           PY
           chmod +x android-app/gradlew
 
+      - name: Add Ash live internet search
+        run: |
+          python3 scripts/patch-native-web-search.py
+          grep -q 'android.permission.INTERNET' android-app/app/src/main/AndroidManifest.xml
+          grep -q 'web_search_toggle' android-app/app/src/main/res/layout/activity_main.xml
+          grep -q 'buildWebPrompt' android-app/app/src/main/java/com/example/llama/MainActivity.kt
+
       - name: Build arm64 Android APK
         working-directory: android-app
         env:
