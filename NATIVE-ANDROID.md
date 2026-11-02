@@ -9,6 +9,7 @@ This repository keeps the lightweight browser prototype, and the `native-android
 - Target device ABI: `arm64-v8a` (Galaxy A70)
 - Inference: upstream `llama.cpp` Android inference library; GGUF stays on the phone.
 - No API key and no hosted inference service are used.
+- Optional **Web search** toggle uses the public DuckDuckGo HTML results page over HTTPS. Only the current search query is sent to DuckDuckGo; chat history and GGUF inference stay on the phone. Search snippets and source URLs are added to the local model's prompt. Turn Web search off for fully offline chats. No search API key is required.
 - Model selection uses Android's document picker. The upstream sample copies the selected GGUF into app-private storage before loading it.
 
 The workflow pins llama.cpp to commit `f3586e66bc916d672773d4a6505513ba91a3595c` so a future upstream change does not silently alter this build.
