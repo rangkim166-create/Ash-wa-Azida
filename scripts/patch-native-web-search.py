@@ -45,7 +45,7 @@ if "private suspend fun buildWebPrompt" not in s:
     )
     s = s.replace(
         "        userActionFab = findViewById(R.id.fab)\n",
-        "        userActionFab = findViewById(R.id.fab)\n        webSearchButton = findViewById(R.id.web_search_toggle)\n        webSearchButton.setOnClickListener {\n            webSearchEnabled = !webSearchEnabled\n            webSearchButton.text = if (webSearchEnabled) \"Web search: ON\" else \"Web search: OFF\"\n            Toast.makeText(this, if (webSearchEnabled) \"Ash will search the public web before answering.\" else \"Ash will answer locally without web search.\", Toast.LENGTH_SHORT).show()\n        }\n"
+        "        userActionFab = findViewById(R.id.fab)\n        webSearchButton = findViewById(R.id.web_search_toggle)\n        webSearchButton.setOnClickListener {\n            webSearchEnabled = !webSearchEnabled\n            webSearchButton.text = if (webSearchEnabled) \"Web search: ON\" else \"Web search: OFF\"\n            Toast.makeText(this, if (webSearchEnabled) \"Search query goes to DuckDuckGo; your chat and model stay on-device.\" else \"Ash will answer locally without web search.\", Toast.LENGTH_SHORT).show()\n        }\n"
     )
     s = s.replace(
         "                    engine.sendUserPrompt(userMsg)\n",
