@@ -115,7 +115,7 @@ if "private suspend fun buildWebPrompt" not in s:
         User question: $query
 
         Live public web search results collected at ${java.time.Instant.now()}:
-        ${results.joinToString("\\n\\n")}
+        ${results.joinToString("\n\n")}
         """.trimIndent()
     }
 
